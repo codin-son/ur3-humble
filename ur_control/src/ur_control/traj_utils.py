@@ -22,8 +22,9 @@
 #
 # Author: Cristian Beltran
 
-import rospy
 import numpy as np
+import logging
+_logger = logging.getLogger(__name__)
 from ur_control import transformations
 
 
@@ -188,7 +189,7 @@ def compute_trajectory(initial_pose, plane, radius, radius_direction, steps=100,
         # Hack for some reason this offset does not work for changes w.r.t Z
         traj = get_spiral_trajectory(p1, p2, steps, revolutions, from_center=from_center, inverse=("Z" in radius_direction))
     else:
-        rospy.logerr("Unsupported trajectory type: %s" % trajectory_type)
+        _logger.error("Unsupported trajectory type: %s" % trajectory_type)
 
     traj = np.apply_along_axis(target_orientation.rotate, 1, traj)
     trajectory = traj + final_pose

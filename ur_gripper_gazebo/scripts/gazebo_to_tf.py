@@ -1,35 +1,49 @@
-#!/usr/bin/python
-import rospy
+#!/usr/bin/env python3
+"""Broadcast Gazebo model poses as TF transforms — ROS2 Humble"""
+import rclpy
+from rclpy.node import Node
 
 from gazebo_msgs.msg import ModelStates
-
-import tf
-import rospy
+import tf2_ros
+from geometry_msgs.msg import TransformStamped
 
 from ur_control import conversions
 
 
-class GazeboToTf:
-    """ Class to handle ROS-Gazebo model respawn """
+class GazeboToTf(Node):
+    """Republish Gazebo model poses to TF."""
 
     def __init__(self):
-        rospy.Subscriber("/gazebo/model_states", ModelStates, self.callback)
-        self.tf_publisher = tf.TransformBroadcaster()
-        self.time_now = rospy.Time.now()
+        super().__init__('gazebo_to_tf')
+        self.tf_broadcaster = tf2_ros.TransformBroadcaster(self)
+        self.create_subscription(ModelStates, "/gazebo/model_states", self.callback, 10)
+        self._last_time = None
 
     def callback(self, data):
-        if rospy.Time.now() is not self.time_now:
-            for i in range(len(data.name)):
-                # get model state of all objects
-                self.tf_publisher.sendTransform(conversions.from_point(data.pose[i].position),
-                                                conversions.from_quaternion(data.pose[i].orientation),
-                                                rospy.Time.now(),
-                                                data.name[i],
-                                                "world")
-            self.time_now = rospy.Time.now()
+        now = self.get_clock().now()
+        if self._last_time is not None and now == self._last_time:
+            return
+        for i in range(len(data.name)):
+            t = TransformStamped()
+            t.header.stamp = now.to_msg()
+            t.header.frame_id = "world"
+            t.child_frame_id = data.name[i]
+            pos = data.pose[i].position
+            t.transform.translation.x = pos.x
+            t.transform.translation.y = pos.y
+            t.transform.translation.z = pos.z
+            t.transform.rotation = data.pose[i].orientation
+            self.tf_broadcaster.sendTransform(t)
+        self._last_time = now
+
+
+def main(args=None):
+    rclpy.init(args=args)
+    node = GazeboToTf()
+    rclpy.spin(node)
+    node.destroy_node()
+    rclpy.shutdown()
 
 
 if __name__ == '__main__':
-    rospy.init_node('gazebo_to_tf')
-    g2tf = GazeboToTf()
-    rospy.spin()
+    main()

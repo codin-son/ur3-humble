@@ -1,15 +1,13 @@
-CMAKE_MINIMUM_REQUIRED(VERSION 3.1.3)
-PROJECT(ur_gripper_description)
+cmake_minimum_required(VERSION 3.8)
+project(ur_gripper_description)
 
-FIND_PACKAGE(catkin REQUIRED)
-CATKIN_PACKAGE()
+find_package(ament_cmake REQUIRED)
 
-INCLUDE_DIRECTORIES()
+install(DIRECTORY launch DESTINATION share/${PROJECT_NAME})
+install(DIRECTORY urdf DESTINATION share/${PROJECT_NAME})
 
-#############
-## Install ##
-#############
+if(EXISTS meshes)
+  install(DIRECTORY meshes DESTINATION share/${PROJECT_NAME})
+endif()
 
-INSTALL(DIRECTORY launch DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
-INSTALL(DIRECTORY urdf DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
-INSTALL(DIRECTORY meshes DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
+ament_package()

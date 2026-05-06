@@ -27,13 +27,15 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-import rospy
+import rclpy
+from rclpy.node import Node
 
 from ur_pykdl import ur_kinematics
 
 
 def main():
-    rospy.init_node('ur_kinematics')
+    rclpy.init()
+    _node = Node('ur_kinematics')
     print('*** ur PyKDL Kinematics ***\n')
     kin = ur_kinematics('right')
 

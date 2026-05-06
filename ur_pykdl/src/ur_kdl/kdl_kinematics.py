@@ -30,8 +30,7 @@
 # Author: Kelsey Hawkins
 
 import numpy as np
-
-import rospy
+import time
 
 import PyKDL as kdl
 
@@ -237,8 +236,8 @@ class KDLKinematics(object):
     # @param timeout Time in seconds to look for a solution.
     # @return np.array of joint angles needed to reach the pose or None if no solution was found.
     def inverse_search(self, pose, timeout=1.):
-        st_time = rospy.get_time()
-        while not rospy.is_shutdown() and rospy.get_time() - st_time < timeout:
+        st_time = time.time()
+        while time.time() - st_time < timeout:
             q_init = self.random_joint_angles()
             q_ik = self.inverse(pose, q_init)
             if q_ik is not None:
@@ -449,9 +448,8 @@ def main():
             print(("Cartesian inertia matrix:", M_cart))
 
     if True:
-        rospy.init_node("kdl_kinematics")
         num_times = 20
-        while not rospy.is_shutdown() and num_times > 0:
+        while num_times > 0:
             base_link = robot.get_root()
             end_link = list(robot.links.keys())[random.randint(0, len(robot.links)-1)]
             print(("Root link: %s; Random end link: %s" % (base_link, end_link)))

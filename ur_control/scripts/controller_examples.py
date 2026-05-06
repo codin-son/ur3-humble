@@ -31,7 +31,9 @@ from ur_control.arm import Arm
 from ur_control.constants import GripperType
 import argparse
 import random
-import rospy
+import rclpy
+from rclpy.node import Node
+import time as _time
 import timeit
 
 np.set_printoptions(suppress=True)
@@ -80,14 +82,14 @@ def move_endeffector():
 def move_gripper():
     print("closing")
     arm.gripper.close()
-    rospy.sleep(1.0)
+    _time.sleep(1.0)
     print("opening")
     arm.gripper.open()
-    rospy.sleep(1.0)
+    _time.sleep(1.0)
     print("moving")
     arm.gripper.command(0.5, percentage=True)  # in percentage (80%)
     # 0.0 is full close, 1.0 is full open
-    rospy.sleep(1.0)
+    _time.sleep(1.0)
     print("moving")
     arm.gripper.command(0.01)  # in meters
     # 0.05 is full open, 0.0 is full close
@@ -106,7 +108,7 @@ def grasp_naive():
     arm.set_joint_positions(positions=q2, wait=True, target_time=1.0)
 
     arm.gripper.command(0.036)
-    rospy.sleep(0.5)
+    _time.sleep(0.5)
 
     q1 = [1.82224, -1.59475,  1.68247, -1.80611, -1.60922,  0.24936]
     arm.set_joint_positions(positions=q1, wait=True, target_time=1.0)
@@ -126,7 +128,7 @@ def grasp_plugin():
 
     q1 = [1.82224, -1.59475,  1.68247, -1.80611, -1.60922,  0.24936]
     arm.set_joint_positions(positions=q1, wait=True, target_time=1.0)
-    rospy.sleep(2.0)  # release after 2 secs
+    _time.sleep(2.0)  # release after 2 secs
 
     # dettach the object "link" to the robot "model_name"::"link_name"
     arm.gripper.open()
@@ -175,7 +177,7 @@ def circular_trajectory():
         actual_trajectory.append(next_pose)
 
         arm.set_target_pose(pose=next_pose, target_time=duration/steps, wait=False)
-        rospy.sleep(duration/steps)
+        _time.sleep(duration/steps)
 
     arm.set_pose_trajectory(trajectory=actual_trajectory, target_time=duration)
 
@@ -200,13 +202,14 @@ def main():
 
     args = parser.parse_args()
 
-    rospy.init_node('ur3e_script_control')
+    rclpy.init()
+    _node = Node('ur3e_script_control')
 
     global arm
     arm = Arm(gripper_type=GripperType.GENERIC)
 
     real_start_time = timeit.default_timer()
-    ros_start_time = rospy.get_time()
+    ros_start_time = _time.time()
 
     if args.move:
         move_joints()
@@ -224,7 +227,7 @@ def main():
         circular_trajectory()
 
     print("real time", round(timeit.default_timer() - real_start_time, 3))
-    print("ros time", round(rospy.get_time() - ros_start_time, 3))
+    print("ros time", round(_time.time() - ros_start_time, 3))
 
 
 if __name__ == "__main__":

@@ -1,26 +1,23 @@
-# ROS utilities used by the CRI group
-#! /usr/bin/env python
+# ROS2 utilities used by the CRI group
 import os
 import sys
 import copy
 import time
 import numpy as np
-import rospy
-import rospkg
-import sys
-import inspect
+import rclpy
+import rclpy.logging
+from ament_index_python.packages import get_package_share_directory
 from ur_control import transformations, spalg
 from sensor_msgs.msg import JointState
 from pyquaternion import Quaternion
 
+
 def load_urdf_string(package, filename):
-    rospack = rospkg.RosPack()
-    package_dir = rospack.get_path(package)
-    urdf_file = package_dir + '/urdf/' + filename + '.urdf'
-    urdf = None
+    package_dir = get_package_share_directory(package)
+    urdf_file = os.path.join(package_dir, 'urdf', filename + '.urdf')
     with open(urdf_file) as f:
-        urdf = f.read()
-    return urdf
+        return f.read()
+
 
 class PDRotation:
     def __init__(self, kp, kd=None):
@@ -29,7 +26,7 @@ class PDRotation:
         self.reset()
 
     def reset(self):
-        self.last_time = rospy.get_rostime()
+        self.last_time = time.time()
         self.last_error = Quaternion()
 
     def set_gains(self, kp=None, kd=None):
@@ -39,43 +36,38 @@ class PDRotation:
             self.kd = np.array(kd)
 
     def update(self, quaternion_error, dt=None):
-        now = rospy.get_rostime()
+        now = time.time()
         if dt is None:
             dt = now - self.last_time
 
-        k_prime = 2 * quaternion_error.scalar*np.identity(3)-spalg.skew(quaternion_error.vector)
+        k_prime = 2 * quaternion_error.scalar * np.identity(3) - spalg.skew(quaternion_error.vector)
         p_term = np.dot(self.kp, k_prime)
 
-        # delta_error = quaternion_error - self.last_error
         w = transformations.angular_velocity_from_quaternions(quaternion_error, self.last_error, dt)
         d_term = self.kd * w
 
         output = p_term + d_term
-        # Save last values
         self.last_error = quaternion_error
         self.last_time = now
         return output
 
+
 class PID:
     def __init__(self, Kp, Ki=None, Kd=None, dynamic_pid=False, max_gain_multiplier=10.0):
-        # Proportional gain
         self.Kp = np.array(Kp)
         self.Ki = np.zeros_like(Kp)
         self.Kd = np.zeros_like(Kp)
-        # Integral gain
         if Ki is not None:
             self.Ki = np.array(Ki)
-        # Derivative gain
         if Kd is not None:
             self.Kd = np.array(Kd)
         self.set_windup(np.ones_like(self.Kp))
-        # Reset
         self.reset()
         self.scale_gains = dynamic_pid
         self.max_gain_multiplier = max_gain_multiplier
 
     def reset(self):
-        self.last_time = rospy.get_rostime()
+        self.last_time = time.time()
         self.last_error = np.zeros_like(self.Kp)
         self.integral = np.zeros_like(self.Kp)
 
@@ -92,18 +84,13 @@ class PID:
         self.i_max = np.array(windup)
 
     def update(self, error, dt=None):
-        # CAUTION: naive scaling of the Kp parameter based on the error
-        # The main idea, the smaller the error the higher the gain
         if self.scale_gains:
             kp = np.zeros_like(self.Kp)
             kd = np.zeros_like(self.Kd)
-
             for i in range(len(error)):
-                # from position_error < 0.01m increase scale error
                 factor = 1 - np.tanh(100 * error[i])
                 kp[i] = np.interp(factor, [0.0, 1.0], [self.Kp[i], self.Kp[i] * self.max_gain_multiplier])
                 kd[i] = np.interp(factor, [0.0, 1.0], [self.Kd[i], self.Kd[i] * self.max_gain_multiplier])
-
             kd = self.Kd
             ki = self.Ki
         else:
@@ -111,46 +98,36 @@ class PID:
             kd = self.Kd
             ki = self.Ki
 
-        now = rospy.get_rostime()
+        now = time.time()
         if dt is None:
             dt = now - self.last_time
         delta_error = error - self.last_error
-        # Compute terms
         self.integral += error * dt
         p_term = kp * error
         i_term = ki * self.integral
         i_term = np.maximum(self.i_min, np.minimum(i_term, self.i_max))
-        
-        # First delta error is huge since it was initialized at zero first, avoid considering
+
         if not np.allclose(self.last_error, np.zeros_like(self.last_error)):
             d_term = kd * delta_error / dt
         else:
             d_term = kd * np.zeros_like(delta_error) / dt
 
         output = p_term + i_term + d_term
-        # Save last values
         self.last_error = np.array(error)
         self.last_time = now
         return output
 
 
 class TextColors:
-    """
-    The C{TextColors} class is used as alternative to the C{rospy} logger. It's useful to
-    print messages when C{roscore} is not running.
-    """
     HEADER = '\033[95m'
     OKBLUE = '\033[94m'
     OKGREEN = '\033[92m'
     WARNING = '\033[93m'
     FAIL = '\033[91m'
     ENDC = '\033[0m'
-    log_level = rospy.INFO
+    log_level = rclpy.logging.LoggingSeverity.INFO
 
     def disable(self):
-        """
-        Resets the coloring.
-        """
         self.HEADER = ''
         self.OKBLUE = ''
         self.OKGREEN = ''
@@ -159,201 +136,79 @@ class TextColors:
         self.ENDC = ''
 
     def blue(self, msg):
-        """
-        Prints a B{blue} color message
-        @type  msg: string
-        @param msg: the message to be printed.
-        """
         print((self.OKBLUE + msg + self.ENDC))
 
     def debug(self, msg):
-        """
-        Prints a B{green} color message
-        @type  msg: string
-        @param msg: the message to be printed.
-        """
         print((self.OKGREEN + msg + self.ENDC))
 
     def error(self, msg):
-        """
-        Prints a B{red} color message
-        @type  msg: string
-        @param msg: the message to be printed.
-        """
         print((self.FAIL + msg + self.ENDC))
 
     def ok(self, msg):
-        """
-        Prints a B{green} color message
-        @type  msg: string
-        @param msg: the message to be printed.
-        """
         print((self.OKGREEN + msg + self.ENDC))
 
     def warning(self, msg):
-        """
-        Prints a B{yellow} color message
-        @type  msg: string
-        @param msg: the message to be printed.
-        """
         print((self.WARNING + msg + self.ENDC))
 
     def logdebug(self, msg):
-        """
-        Prints message with the word 'Debug' in green at the begging.
-        Alternative to C{rospy.logdebug}.
-        @type  msg: string
-        @param msg: the message to be printed.
-        """
-        if self.log_level <= rospy.DEBUG:
+        if self.log_level <= rclpy.logging.LoggingSeverity.DEBUG:
             print((self.OKGREEN + 'Debug ' + self.ENDC + str(msg)))
 
     def loginfo(self, msg):
-        """
-        Prints message with the word 'INFO' begging.
-        Alternative to C{rospy.loginfo}.
-        @type  msg: string
-        @param msg: the message to be printed.
-        """
-        if self.log_level <= rospy.INFO:
+        if self.log_level <= rclpy.logging.LoggingSeverity.INFO:
             print(('INFO ' + str(msg)))
 
     def logwarn(self, msg):
-        """
-        Prints message with the word 'Warning' in yellow at the begging.
-        Alternative to C{rospy.logwarn}.
-        @type  msg: string
-        @param msg: the message to be printed.
-        """
-        if self.log_level <= rospy.WARN:
+        if self.log_level <= rclpy.logging.LoggingSeverity.WARN:
             print((self.WARNING + 'Warning ' + self.ENDC + str(msg)))
 
     def logerr(self, msg):
-        """
-        Prints message with the word 'Error' in red at the begging.
-        Alternative to C{rospy.logerr}.
-        @type  msg: string
-        @param msg: the message to be printed.
-        """
-        if self.log_level <= rospy.ERROR:
+        if self.log_level <= rclpy.logging.LoggingSeverity.ERROR:
             print((self.FAIL + 'Error ' + self.ENDC + str(msg)))
 
     def logfatal(self, msg):
-        """
-        Prints message with the word 'Fatal' in red at the begging.
-        Alternative to C{rospy.logfatal}.
-        @type  msg: string
-        @param msg: the message to be printed.
-        """
-        if self.log_level <= rospy.FATAL:
+        if self.log_level <= rclpy.logging.LoggingSeverity.FATAL:
             print((self.FAIL + 'Fatal ' + self.ENDC + str(msg)))
 
     def set_log_level(self, level):
-        """
-        Sets the log level. Possible values are:
-          - DEBUG:  1
-          - INFO:   2
-          - WARN:   4
-          - ERROR:  8
-          - FATAL:  16
-        @type  level: int
-        @param level: the new log level
-        """
         self.log_level = level
 
 
 ## Helper Functions ##
 def assert_shape(variable, name, shape):
-    """
-    Asserts the shape of an np.array
-    @type  variable: Object
-    @param variable: variable to be asserted
-    @type  name: string
-    @param name: variable name
-    @type  shape: tuple
-    @param ttype: expected shape of the np.array
-    """
     assert variable.shape == shape, '%s must have a shape %r: %r' % (name, shape, variable.shape)
 
 
 def assert_type(variable, name, ttype):
-    """
-    Asserts the type of a variable with a given name
-    @type  variable: Object
-    @param variable: variable to be asserted
-    @type  name: string
-    @param name: variable name
-    @type  ttype: Type
-    @param ttype: expected variable type
-    """
-    assert type(variable) is ttype,  '%s must be of type %r: %r' % (name, ttype, type(variable))
+    assert type(variable) is ttype, '%s must be of type %r: %r' % (name, ttype, type(variable))
 
 
 def db_error_msg(name, logger=TextColors()):
-    """
-    Prints out an error message appending the given database name.
-    @type  name: string
-    @param name: database name
-    @type  logger: Object
-    @param logger: Logger instance. When used in ROS, the recommended C{logger=rospy}.
-    """
-    msg = 'Database %s not found. Please generate it. [rosrun denso_openrave generate_databases.py]' % name
+    msg = 'Database %s not found. Please generate it.' % name
     logger.logerr(msg)
 
 
 def clean_cos(value):
-    """
-    Limits the a value between the range C{[-1, 1]}
-    @type value: float
-    @param value: The input value
-    @rtype: float
-    @return: The limited value in the range C{[-1, 1]}
-    """
     return min(1, max(value, -1))
 
 
 def has_keys(data, keys):
-    """
-    Checks whether a dictionary has all the given keys.
-    @type   data: dict
-    @param  data: Parameter name
-    @type   keys: list
-    @param  keys: list containing the expected keys to be found in the dict.
-    @rtype: bool
-    @return: True if all the keys are found in the dict, false otherwise.
-    """
     if not isinstance(data, dict):
         return False
-    has_all = True
-    for key in keys:
-        if key not in data:
-            has_all = False
-            break
-    return has_all
+    return all(k in data for k in keys)
 
 
 def raise_not_implemented():
-    """
-    Raises a NotImplementedError exception
-    """
     raise NotImplementedError()
 
 
-def topic_exist(topic):
-    published_topics = rospy.get_published_topics()
-    for pt in published_topics:
-        if topic == pt[0] :
-            return True
-    return False
+def topic_exist(node, topic):
+    """Check if topic exists. node: rclpy.Node instance."""
+    topic_names = [name for name, _ in node.get_topic_names_and_types()]
+    return topic in topic_names
+
 
 def read_key(echo=False):
-    """
-    Reads a key from the keyboard
-    @type   echo: bool, optional
-    @param  echo: if set, will show the input key in the console.
-    @rtype: str
-    @return: The limited value in the range C{[-1, 1]}
-    """
     if not echo:
         os.system("stty -echo")
     key = sys.stdin.read(1)
@@ -361,112 +216,52 @@ def read_key(echo=False):
         os.system("stty echo")
     return key.lower()
 
+
 def resolve_parameter(value, default_value):
     if value:
         return value
-    else:
-        return default_value
-
-def read_parameter(name, default):
-    """
-    Get a parameter from the ROS parameter server. If it's not found, a
-    warn is printed.
-    @type  name: string
-    @param name: Parameter name
-    @type  default: Object
-    @param default: Default value for the parameter. The type should be
-    the same as the one expected for the parameter.
-    @rtype: any
-    @return: The resulting parameter
-    """
-    if rospy.is_shutdown():
-        logger = TextColors()
-        logger.logwarn('roscore not found, parameter [%s] using default: %s' % (name, default))
-    else:
-        if not rospy.has_param(name):
-            rospy.logwarn('Parameter [%s] not found, using default: %s' % (name, default))
-        return rospy.get_param(name, default)
-    return default
+    return default_value
 
 
-def read_parameter_err(name):
-    """
-    Get a parameter from the ROS parameter server. If it's not found, a
-    error is printed.
-    @type name: string
-    @param name: Parameter name
-    @rtype: has_param, param
-    @return: (has_param) True if succeeded, false otherwise. The
-    parameter is None if C{has_param=False}.
-    """
-    if rospy.is_shutdown():
-        logger = TextColors()
-        logger.logerr('roscore not found')
-        has_param = False
-    else:
-        has_param = True
-        if not rospy.has_param(name):
-            rospy.logerr("Parameter [%s] not found" % (name))
-            has_param = False
-    return has_param, rospy.get_param(name, None)
+def read_parameter(node, name, default):
+    """Get ROS2 parameter. node: rclpy.Node instance."""
+    if not node.has_parameter(name):
+        node.get_logger().warn('Parameter [%s] not found, using default: %s' % (name, default))
+    return node.get_parameter_or(name, rclpy.parameter.Parameter(name, value=default)).value
 
 
-def read_parameter_fatal(name):
-    """
-    Get a parameter from the ROS parameter server. If it's not found, an
-    exception will be raised.
-    @type name: string
-    @param name: Parameter name
-    @rtype: any
-    @return: The resulting parameter
-    """
-    if rospy.is_shutdown():
-        logger = TextColors()
-        logger.logfatal('roscore not found')
+def read_parameter_err(node, name):
+    """Get ROS2 parameter or log error."""
+    if not node.has_parameter(name):
+        node.get_logger().error("Parameter [%s] not found" % name)
+        return False, None
+    return True, node.get_parameter(name).value
+
+
+def read_parameter_fatal(node, name):
+    """Get ROS2 parameter or raise."""
+    if not node.has_parameter(name):
+        node.get_logger().fatal("Parameter [%s] not found" % name)
         raise Exception('Required parameter {0} not found'.format(name))
-    else:
-        if not rospy.has_param(name):
-            rospy.logfatal("Parameter [%s] not found" % (name))
-            raise Exception('Required parameter {0} not found'.format(name))
-    return rospy.get_param(name, None)
+    return node.get_parameter(name).value
 
 
 def solve_namespace(namespace=None):
-    """
-    Appends neccessary slashes required for a proper ROS namespace.
-    @type namespace: string
-    @param namespace: namespace to be fixed.
-    @rtype: string
-    @return: Proper ROS namespace.
-    """
+    """Normalize ROS2 namespace string."""
     if namespace is None or len(namespace) == 0:
-        namespace = rospy.get_namespace()
-    elif len(namespace) == 1:
-        if namespace != '/':
-            namespace = '/' + namespace + '/'
-    else:
-        if namespace[0] != '/':
-            namespace = '/' + namespace
-        if namespace[-1] != '/':
-            namespace += '/'
+        return '/'
+    if not namespace.startswith('/'):
+        namespace = '/' + namespace
+    if not namespace.endswith('/'):
+        namespace += '/'
     return namespace
 
 
 def sorted_joint_state_msg(msg, joint_names):
-    """
-    Returns a sorted C{sensor_msgs/JointState} for the given joint names
-    @type  msg: sensor_msgs/JointState
-    @param msg: The input message
-    @type  joint_names: list
-    @param joint_names: The sorted joint names
-    @rtype: sensor_msgs/JointState
-    @return: The C{JointState} message with the fields in the order given by joint names
-    """
     valid_names = set(joint_names).intersection(set(msg.name))
     valid_position = len(msg.name) == len(msg.position)
     valid_velocity = len(msg.name) == len(msg.velocity)
     valid_effort = len(msg.name) == len(msg.effort)
-    num_joints = len(valid_names)
     retmsg = JointState()
     retmsg.header = copy.deepcopy(msg.header)
     for name in joint_names:
@@ -484,14 +279,6 @@ def sorted_joint_state_msg(msg, joint_names):
 
 
 def unique(data):
-    """
-    Finds the unique elements of an array. B{row-wise} and
-    returns the sorted unique elements of an array.
-    @type  data: np.array
-    @param data: Input array.
-    @rtype: np.array
-    @return: The sorted unique array.
-    """
     order = np.lexsort(data.T)
     data = data[order]
     diff = np.diff(data, axis=0)

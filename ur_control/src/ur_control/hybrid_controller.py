@@ -6,7 +6,6 @@
 # distribution of this software and related documentation without an express
 # license agreement from Cristian Beltran is strictly prohibited.
 
-import rospy
 from ur_control import utils, conversions, spalg
 import numpy as np
 

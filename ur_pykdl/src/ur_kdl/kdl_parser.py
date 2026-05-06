@@ -32,8 +32,6 @@
 
 import numpy as np
 
-import rospy
-
 import PyKDL as kdl
 
 from urdf_parser_py.urdf import URDF

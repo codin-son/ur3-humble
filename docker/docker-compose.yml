@@ -21,9 +21,9 @@ services:
       - NVIDIA_DRIVER_CAPABILITIES=all
       - NVIDIA_REQUIRE_CUDA=cuda>=9.0
       - DOCKER_RUNTIME=${DOCKER_RUNTIME}
-      # Needs to be explicitly define
-      - ROS_HOSTNAME=localhost
-    image: ros-ur:noetic
+      # ROS2
+      - ROS_DOMAIN_ID=0
+    image: ros-ur:humble
     tty: true
     build:
       context: ../
@@ -31,14 +31,13 @@ services:
       args:
         - DOCKERFILE_COMMIT_SHORT_SHA
     volumes:
-      # Map ROS workspace folders.
-      - ../:/root/ros_ws/src/ros-ur
+      # Map ROS2 workspace folders.
+      - ../:/root/ros2_ws/src/ros-ur
       # Grant display access to X Server.
       - /tmp/.X11-unix:/tmp/.X11-unix
-      # Grant bus access to FlexBE App.
+      # Grant bus access.
       - /var/run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket
-      # Grant access to serial usb ports for u2d2
+      # Grant access to serial usb ports.
       - /dev/:/dev/
     network_mode: host
     command: tail -f /dev/null
-

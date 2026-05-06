@@ -9,7 +9,6 @@
 # Author: Cristian Beltran
 
 import numpy as np
-import rospy
 
 
 class AdmittanceModel():

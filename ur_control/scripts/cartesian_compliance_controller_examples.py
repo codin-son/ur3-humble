@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # The MIT License (MIT)
 #
@@ -29,7 +29,9 @@ import signal
 from ur_control import spalg, utils, traj_utils, constants
 from ur_control.fzi_cartesian_compliance_controller import CompliantController
 import argparse
-import rospy
+import rclpy
+from rclpy.node import Node
+import time as _time
 import numpy as np
 
 np.set_printoptions(suppress=True)
@@ -150,7 +152,7 @@ def slicing():
 
 def admittance_control():
     """ Spring-mass-damper force control """
-    rospy.loginfo("START ADMITTANCE")
+    print("START ADMITTANCE")
 
     arm.set_control_mode(mode="spring-mass-damper")
 
@@ -160,12 +162,12 @@ def admittance_control():
                                    max_force_torque=[50., 50., 50., 5., 5., 5.], duration=10,
                                    stop_on_target_force=False)
 
-    rospy.loginfo("STOP ADMITTANCE")
+    print("STOP ADMITTANCE")
 
 
 def free_drive():
-    rospy.loginfo("START FREE DRIVE")
-    rospy.sleep(0.5)
+    print("START FREE DRIVE")
+    _time.sleep(0.5)
     arm.zero_ft_sensor()
     # arm.set_control_mode("parallel")
     arm.set_control_mode("spring-mass-damper")
@@ -207,7 +209,7 @@ def free_drive():
                                          stop_on_target_force=False)
     print(res)
     print("EE change", ee - arm.end_effector())
-    rospy.loginfo("STOP FREE DRIVE")
+    print("STOP FREE DRIVE")
 
 
 def test():
@@ -240,7 +242,7 @@ def enable_compliance_control():
     for _ in range(30):
         print("current target pose", arm.current_target_pose[:3])
         print("error", arm.current_target_pose[:3] - arm.end_effector(tip_link="b_bot_gripper_tip_link")[:3])
-        rospy.sleep(1)
+        _time.sleep(1)
 
     arm.activate_joint_trajectory_controller()
 
@@ -268,7 +270,8 @@ def main():
                         help='Namespace of arm', default=None)
     args = parser.parse_args()
 
-    rospy.init_node('ur3e_compliance_control')
+    rclpy.init()
+    _node = Node('ur3e_compliance_control')
 
     ns = "None"
     joints_prefix = None

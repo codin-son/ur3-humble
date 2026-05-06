@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # The MIT License (MIT)
 #
@@ -30,7 +30,9 @@ from ur_control import utils, traj_utils
 from ur_control.hybrid_controller import ForcePositionController
 from ur_control.compliance_controller import CompliantController
 import argparse
-import rospy
+import rclpy
+from rclpy.node import Node
+import time as _time
 import numpy as np
 np.set_printoptions(suppress=True)
 np.set_printoptions(linewidth=np.inf)
@@ -211,7 +213,8 @@ def main():
                         help='Namespace of arm', default=None)
     args = parser.parse_args()
 
-    rospy.init_node('ur3e_compliance_control')
+    rclpy.init()
+    _node = Node('ur3e_compliance_control')
 
     ns = ''
     joints_prefix = None

@@ -1,5 +1,4 @@
-#! /usr/bin/env python
-import rospy
+#! /usr/bin/env python3
 import numpy as np
 import scipy.optimize
 import ur_control.transformations as tr

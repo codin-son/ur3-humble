@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # The MIT License (MIT)
 #
@@ -33,7 +33,9 @@ and to launch roslaunch spacenav_node classic.launch
 """
 import argparse
 
-import rospy
+import rclpy
+from rclpy.node import Node
+import time as _time
 
 from ur_control.arm import Arm
 from ur_control.mouse_6d import Mouse6D
@@ -64,7 +66,7 @@ def start_control(motion_type="linear"):
     rate = rospy.Rate(125)
     delta_x = 0.01
     delta_q = np.deg2rad(1)
-    while not rospy.is_shutdown():
+    while not not rclpy.ok():
         x = arm.end_effector()
         xd = np.array(mouse6d.twist)
 
@@ -98,7 +100,8 @@ def main():
         '--beta', action='store_true', help='for the real robot. beta driver')
     args = parser.parse_args(rospy.myargv()[1:])
 
-    rospy.init_node("joint_position_keyboard")
+    rclpy.init()
+    _node = Node("joint_position_keyboard")
 
     global arm
     arm = Arm(ft_sensor=False)

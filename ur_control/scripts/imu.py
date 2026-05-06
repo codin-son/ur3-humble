@@ -1,80 +1,41 @@
-#!/usr/bin/env python
-
-# The MIT License (MIT)
-#
-# Copyright (c) 2018-2021 Cristian Beltran
-#
-# Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation files (the "Software"), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-# copies of the Software, and to permit persons to whom the Software is
-# furnished to do so, subject to the following conditions:
-#
-# The above copyright notice and this permission notice shall be included in all
-# copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-# SOFTWARE.
-#
-# Author: Cristian Beltran
+#!/usr/bin/env python3
+# Copyright (c) 2018-2021 Cristian Beltran — ROS2 Humble port
 
 import argparse
-import rospy
-
+import rclpy
+from rclpy.node import Node
 import numpy as np
-from ur_control import conversions, utils
-
+from ur_control import conversions
 from sensor_msgs.msg import Imu
 
 
-class ImuFake(object):
-
-    def __init__(self, topic, namespace="", frequency=500):
-
-        self.ns = namespace
-
-        self.topic = utils.solve_namespace(namespace + "/" + topic)
-
-        # Publisher to outward topic
-        self.pub = rospy.Publisher(self.topic, Imu, queue_size=10)
-
+class ImuFakeNode(Node):
+    def __init__(self, namespace="", frequency=500):
+        super().__init__('imu_fake')
         prefix = "" if not namespace else namespace + "_"
-        base_link = "base_link"
+        topic = (namespace.rstrip('/') + '/imu') if namespace else 'imu'
+        self.pub = self.create_publisher(Imu, topic, 10)
+        gravity = np.array([0, 0, 9.81])
+        self.timer = self.create_timer(1.0 / frequency, lambda: self._publish(prefix, gravity))
 
-        gravity_on_base_link = np.array([0, 0, 9.81])
-
-        rate = rospy.Rate(frequency)
-
-        while not rospy.is_shutdown():
-            msg = Imu()
-            msg.header.frame_id = prefix + base_link
-            msg.header.stamp = rospy.Time.now()
-            msg.linear_acceleration = conversions.to_vector3(gravity_on_base_link)
-            self.pub.publish(msg)
-            try:
-                rate.sleep()
-            except rospy.ROSInterruptException:
-                pass
+    def _publish(self, prefix, gravity):
+        msg = Imu()
+        msg.header.frame_id = prefix + 'base_link'
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.linear_acceleration = conversions.to_vector3(gravity)
+        self.pub.publish(msg)
 
 
-def main():
-    """ Main function to be run. """
-    parser = argparse.ArgumentParser(description='Filter FT signal')
-    parser.add_argument('-ns', '--namespace', type=str, help='Namespace', required=False, default="")
-    
-    args, unknown = parser.parse_known_args()
-
-    rospy.init_node('imu_fake')
-
-    ft_sensor = ImuFake(topic="imu", namespace=args.namespace)
-    
-    rospy.spin()
+def main(args=None):
+    parser = argparse.ArgumentParser(description='Fake IMU publisher')
+    parser.add_argument('-ns', '--namespace', type=str, default="")
+    parsed, remaining = parser.parse_known_args()
+    rclpy.init(args=remaining)
+    node = ImuFakeNode(namespace=parsed.namespace)
+    rclpy.spin(node)
+    node.destroy_node()
+    rclpy.shutdown()
 
 
-main()
+if __name__ == '__main__':
+    main()

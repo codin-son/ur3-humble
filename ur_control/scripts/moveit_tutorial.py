@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # The MIT License (MIT)
 #
@@ -27,7 +27,9 @@
 import argparse
 import sys
 import copy
-import rospy
+import rclpy
+from rclpy.node import Node
+import time as _time
 import moveit_commander
 import moveit_msgs.msg
 import geometry_msgs.msg
@@ -310,9 +312,9 @@ class MoveGroupPythonIntefaceTutorial(object):
         # For the purpose of this tutorial, we call this function after adding,
         # removing, attaching or detaching an object in the planning scene. We then wait
         # until the updates have been made or ``timeout`` seconds have passed
-        start = rospy.get_time()
-        seconds = rospy.get_time()
-        while (seconds - start < timeout) and not rospy.is_shutdown():
+        start = _time.time()
+        seconds = _time.time()
+        while (seconds - start < timeout) and not not rclpy.ok():
             # Test if the box is in attached objects
             attached_objects = scene.get_attached_objects([box_name])
             is_attached = len(attached_objects.keys()) > 0
@@ -326,8 +328,8 @@ class MoveGroupPythonIntefaceTutorial(object):
                 return True
 
             # Sleep so that we give other threads time on the processor
-            rospy.sleep(0.1)
-            seconds = rospy.get_time()
+            _time.sleep(0.1)
+            seconds = _time.time()
 
         # If we exited the while loop without returning then we timed out
         return False
@@ -476,7 +478,7 @@ def main():
     args = parser.parse_args(rospy.myargv()[1:])
 
     tutorial = MoveGroupPythonIntefaceTutorial()
-    rospy.sleep(1)
+    _time.sleep(1)
     if args.move_joints:
         tutorial.display_basic_info()
         tutorial.go_to_joint_state()

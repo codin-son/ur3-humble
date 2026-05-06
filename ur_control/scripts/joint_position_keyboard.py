@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # The MIT License (MIT)
 #
@@ -29,7 +29,9 @@ UR Joint Position Example: keyboard
 """
 import argparse
 
-import rospy
+import rclpy
+from rclpy.node import Node
+import time as _time
 
 from ur_control.arm import Arm
 from ur_control import transformations
@@ -143,7 +145,7 @@ def map_keyboard():
     }
     done = False
     print("Controlling joints. Press ? for help, Esc to quit.")
-    while not done and not rospy.is_shutdown():
+    while not done and not not rclpy.ok():
         c = getch.getch()
         if c:
             # catch Esc or ctrl-c
