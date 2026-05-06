@@ -16,14 +16,10 @@ setup(
         (os.path.join('share', package_name, 'worlds'), glob('worlds/*.world')),
         (os.path.join('share', package_name, 'urdf'), glob('urdf/*.xacro')),
     ] + [
-        (os.path.join('share', package_name, 'models', d), glob(os.path.join('models', d, '*')))
-        for d in os.listdir('models') if os.path.isdir(os.path.join('models', d))
-    ] if os.path.exists('models') else [
-        ('share/ament_index/resource_index/packages', ['resource/' + package_name]),
-        ('share/' + package_name, ['package.xml']),
-        (os.path.join('share', package_name, 'launch'), glob('launch/*.py')),
-        (os.path.join('share', package_name, 'worlds'), glob('worlds/*.world')),
-        (os.path.join('share', package_name, 'urdf'), glob('urdf/*.xacro')),
+        (os.path.join('share', package_name, root),
+         [os.path.join(root, f) for f in files])
+        for root, dirs, files in os.walk('models')
+        if files
     ],
     install_requires=['setuptools'],
     zip_safe=True,

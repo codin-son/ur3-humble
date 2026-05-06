@@ -1,25 +1,25 @@
 # ROS2 Humble dependencies
 # Use vcs import --input dependencies.rosinstall src/
-- git:
-    local-name: robotiq
-    uri: https://github.com/cambel/robotiq.git
-    version: humble-devel
-- git:
-    local-name: gazebo_ros_link_attacher
-    uri: https://github.com/pal-robotics/gazebo_ros_link_attacher.git
-    version: humble-devel
-- git:
-    local-name: robotiq_urcap_control
-    uri: https://github.com/cambel/ros_robotiq_urcap_control.git
-    version: master
-- git:
-    local-name: Universal_Robots_ROS2_Driver
-    uri: https://github.com/UniversalRobots/Universal_Robots_ROS2_Driver.git
-    version: humble
-- git:
-    local-name: trac_ik
-    uri: https://bitbucket.org/traclabs/trac_ik.git
-    version: humble-devel
+#- git:
+#    local-name: robotiq
+#    uri: https://github.com/cambel/robotiq.git
+#    version: humble-devel
+#- git:
+#    local-name: gazebo_ros_link_attacher
+#    uri: https://github.com/pal-robotics/gazebo_ros_link_attacher.git
+#    version: humble-devel
+#- git:
+#    local-name: robotiq_urcap_control
+#    uri: https://github.com/cambel/ros_robotiq_urcap_control.git
+#    version: master
+#- git:
+#    local-name: Universal_Robots_ROS2_Driver
+#    uri: https://github.com/UniversalRobots/Universal_Robots_ROS2_Driver.git
+#    version: humble
+#- git:
+#    local-name: trac_ik
+#    uri: https://bitbucket.org/traclabs/trac_ik.git
+#    version: humble-devel
 - git:
     local-name: Universal_Robots_ROS2_Description
     uri: https://github.com/UniversalRobots/Universal_Robots_ROS2_Description.git
@@ -27,4 +27,4 @@
 - git:
     local-name: ur_msgs
     uri: https://github.com/ros-industrial/ur_msgs.git
-    version: ros2
+    version: humble-devel
