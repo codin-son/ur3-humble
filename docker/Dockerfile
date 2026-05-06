@@ -54,7 +54,23 @@ RUN apt-get update && apt-get install -y \
 RUN /bin/bash -c "source /opt/ros/$ROS_DISTRO/setup.bash \
                && mkdir -p ~/ros2_ws/src \
                && cd ~/ros2_ws/src \
-               && git clone https://github.com/cambel/ur3.git ros-ur -b humble-devel"
+               && git clone https://github.com/codin-son/ur3-humble.git ros-ur -b humble"
+
+# Patch ur_gripper_gazebo: convert from catkin to ament_cmake
+RUN /bin/bash -c "PKG=~/ros2_ws/src/ros-ur/ur_gripper_gazebo \
+               && sed -i 's/CMAKE_MINIMUM_REQUIRED(VERSION 3.1.3)/cmake_minimum_required(VERSION 3.8)/' \$PKG/CMakeLists.txt \
+               && sed -i 's/PROJECT(ur_gripper_gazebo)/project(ur_gripper_gazebo)/' \$PKG/CMakeLists.txt \
+               && sed -i 's/FIND_PACKAGE(catkin REQUIRED)/find_package(ament_cmake REQUIRED)\nfind_package(ament_cmake_python REQUIRED)/' \$PKG/CMakeLists.txt \
+               && sed -i 's/catkin_python_setup()/ament_python_install_package(ur_gazebo)/' \$PKG/CMakeLists.txt \
+               && sed -i 's/catkin_package()//' \$PKG/CMakeLists.txt \
+               && sed -i 's/include_directories()//' \$PKG/CMakeLists.txt \
+               && echo 'install(DIRECTORY launch/ DESTINATION share/\${PROJECT_NAME}/launch)' >> \$PKG/CMakeLists.txt \
+               && echo 'install(DIRECTORY models/ DESTINATION share/\${PROJECT_NAME}/models)' >> \$PKG/CMakeLists.txt \
+               && echo 'install(DIRECTORY worlds/ DESTINATION share/\${PROJECT_NAME}/worlds)' >> \$PKG/CMakeLists.txt \
+               && echo 'install(DIRECTORY urdf/ DESTINATION share/\${PROJECT_NAME}/urdf)' >> \$PKG/CMakeLists.txt \
+               && echo 'install(PROGRAMS scripts/gazebo_to_tf.py scripts/world_publisher.py scripts/spawner.py DESTINATION lib/\${PROJECT_NAME})' >> \$PKG/CMakeLists.txt \
+               && echo 'ament_package()' >> \$PKG/CMakeLists.txt \
+               && rm -f \$PKG/setup.py"
 
 # Install Python3 dependencies
 ENV PYTHONIOENCODING UTF-8
@@ -77,10 +93,11 @@ RUN python3 -m pip install --upgrade pip && \
 
 # Update rosdep and install dependencies
 RUN cd ~/ros2_ws \
-    && rosdep update \
+    && rosdep update --rosdistro=$ROS_DISTRO \
     && rosdep install --from-paths src --ignore-src --rosdistro=$ROS_DISTRO -y \
+       --skip-keys="ament_python robotiq_gazebo python3-pyquaternion robotiq_description ur_description trac_ik_python" \
     && rm -rf /var/lib/apt/lists/*
-
+    
 # Build workspace
 RUN /bin/bash -c "source /opt/ros/$ROS_DISTRO/setup.bash \
                && cd ~/ros2_ws/ \
